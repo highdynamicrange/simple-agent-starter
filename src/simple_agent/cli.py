@@ -133,9 +133,7 @@ def main() -> None:
 
         try:
             print("\nAgent：", end="", flush=True)
-            answer = agent.run(
-                user_input, on_token=lambda t: print(t, end="", flush=True)
-            )
+            agent.run(user_input, on_token=lambda t: print(t, end="", flush=True))
         except (ValueError, LLMClientError) as exc:
             print(f"\n错误：{exc}")
 

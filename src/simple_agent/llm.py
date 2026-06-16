@@ -100,7 +100,7 @@ class OpenAICompatibleClient:
         try:
             response = self._client.chat.completions.create(**kwargs)
 
-            # 累积工具调用的缓冲区，按 index 分组
+            # 累积工具调用的缓冲区, 按 index 分组
             tool_buffers: dict[int, dict[str, str]] = {}
             content_parts: list[str] = []
             reasoning_parts: list[str] = []
@@ -110,7 +110,7 @@ class OpenAICompatibleClient:
                 if delta is None:
                     continue
 
-                # 推理内容（thinking）
+                # 推理内容 (thinking)
                 rc = getattr(delta, "reasoning_content", None)
                 if rc:
                     reasoning_parts.append(rc)
@@ -135,7 +135,7 @@ class OpenAICompatibleClient:
                         if tc.function.arguments:
                             buf["arguments"] += tc.function.arguments
 
-            # 流结束，组装完整 tool_calls
+            # 流结束, 组装完整 tool_calls
             calls = [
                 ToolCall(id=b["id"], name=b["name"], arguments=b["arguments"])
                 for b in (tool_buffers[i] for i in sorted(tool_buffers))
