@@ -38,6 +38,13 @@ class Agent:
             raise ValueError("模型名称不能为空。")
         self.model = model
 
+    def set_client(self, client: LLMClient) -> None:
+        self.client = client
+
+    def remove_provider_specific_fields(self) -> None:
+        for message in self._messages:
+            message.pop("reasoning_content", None)
+
     def run(self, user_input: str) -> str:
         user_input = user_input.strip()
         if not user_input:
@@ -55,7 +62,7 @@ class Agent:
             )
             if not reply.tool_calls:
                 content = (reply.content or "").strip() or "模型没有返回可显示的内容。"
-                self._messages.append({"role": "assistant", "content": content})
+                self._messages.append(_assistant_content_message(content, reply))
                 return content
 
             self._messages.append(_assistant_tool_message(reply))
@@ -76,7 +83,7 @@ class Agent:
 
 
 def _assistant_tool_message(reply: ModelReply) -> Message:
-    return {
+    message: Message = {
         "role": "assistant",
         "content": reply.content,
         "tool_calls": [
@@ -91,3 +98,13 @@ def _assistant_tool_message(reply: ModelReply) -> Message:
             for call in reply.tool_calls
         ],
     }
+    if reply.reasoning_content:
+        message["reasoning_content"] = reply.reasoning_content
+    return message
+
+
+def _assistant_content_message(content: str, reply: ModelReply) -> Message:
+    message: Message = {"role": "assistant", "content": content}
+    if reply.reasoning_content:
+        message["reasoning_content"] = reply.reasoning_content
+    return message

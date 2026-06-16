@@ -30,6 +30,3 @@ class FakeLLMClient:
         if self.error:
             raise self.error
         return self.replies.pop(0)
-
-    def supports_tools(self, model: str) -> bool | None:
-        return True

@@ -104,3 +104,23 @@ def test_model_switching(tmp_path):
     assert client.calls[0]["model"] == "anthropic/example"
     with pytest.raises(ValueError, match="不能为空"):
         agent.set_model(" ")
+
+
+def test_preserves_and_cleans_reasoning_content(tmp_path):
+    call = ToolCall(id="call-1", name="calculator", arguments='{"expression":"2+2"}')
+    agent, _client = make_agent(
+        tmp_path,
+        [
+            ModelReply(reasoning_content="need math", tool_calls=[call]),
+            ModelReply(content="4", reasoning_content="done"),
+        ],
+    )
+
+    assert agent.run("算一下") == "4"
+    assert any("reasoning_content" in message for message in agent.messages)
+
+    new_client = FakeLLMClient([ModelReply(content="new")])
+    agent.set_client(new_client)
+    agent.remove_provider_specific_fields()
+
+    assert all("reasoning_content" not in message for message in agent.messages)
