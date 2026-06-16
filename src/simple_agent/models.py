@@ -15,4 +15,11 @@ class ModelReply(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
+class StreamChunk(BaseModel):
+    delta: str | None = None
+    reasoning_delta: str | None = None
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    finished: bool = False
+
+
 Message = dict[str, Any]

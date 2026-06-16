@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from simple_agent.llm import LLMClient
 from simple_agent.models import Message, ModelReply
 from simple_agent.tools import ToolRegistry
@@ -45,7 +47,11 @@ class Agent:
         for message in self._messages:
             message.pop("reasoning_content", None)
 
-    def run(self, user_input: str) -> str:
+    def run(
+        self,
+        user_input: str,
+        on_token: Callable[[str], None] | None = None,
+    ) -> str:
         user_input = user_input.strip()
         if not user_input:
             raise ValueError("输入不能为空。")
@@ -55,18 +61,43 @@ class Agent:
         self._messages.append({"role": "user", "content": user_input})
 
         for _ in range(self.max_steps):
-            reply = self.client.complete(
+            content_parts: list[str] = []
+            reasoning_parts: list[str] = []
+            tool_calls = []
+
+            for chunk in self.client.complete_stream(
                 model=self.model,
                 messages=self._messages,
                 tools=self.tools.schemas,
-            )
-            if not reply.tool_calls:
-                content = (reply.content or "").strip() or "模型没有返回可显示的内容。"
-                self._messages.append(_assistant_content_message(content, reply))
+            ):
+                if chunk.delta:
+                    content_parts.append(chunk.delta)
+                    if on_token:
+                        on_token(chunk.delta)
+                if chunk.reasoning_delta:
+                    reasoning_parts.append(chunk.reasoning_delta)
+                if chunk.finished:
+                    tool_calls = chunk.tool_calls
+
+            content = "".join(content_parts)
+            reasoning = "".join(reasoning_parts) or None
+
+            if not tool_calls:
+                content = content.strip() or "模型没有返回可显示的内容。"
+                self._messages.append(
+                    _assistant_content_message(content, reasoning)
+                )
+                if on_token:
+                    on_token("\n")
                 return content
 
+            reply = ModelReply(
+                content=content or None,
+                reasoning_content=reasoning,
+                tool_calls=tool_calls,
+            )
             self._messages.append(_assistant_tool_message(reply))
-            for tool_call in reply.tool_calls:
+            for tool_call in tool_calls:
                 result = self.tools.execute(tool_call.name, tool_call.arguments)
                 self._messages.append(
                     {
@@ -103,8 +134,10 @@ def _assistant_tool_message(reply: ModelReply) -> Message:
     return message
 
 
-def _assistant_content_message(content: str, reply: ModelReply) -> Message:
+def _assistant_content_message(
+    content: str, reasoning: str | None = None
+) -> Message:
     message: Message = {"role": "assistant", "content": content}
-    if reply.reasoning_content:
-        message["reasoning_content"] = reply.reasoning_content
+    if reasoning:
+        message["reasoning_content"] = reasoning
     return message
